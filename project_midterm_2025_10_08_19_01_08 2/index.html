@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.11.10/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js"></script>
+  <title>Pop your pimples</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      background: #FCC82A;
+      height: 100%;
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Bungee', cursive;
+      text-align: center;
+      margin: 12px 0 6px 0;
+      color: rgb(224, 13, 13);
+      font-size: clamp(56px, 6vw, 88px);
+    }
+
+
+    h2 {
+      font-family: 'Bungee', cursive;
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: clamp(140px, 18vh, 220px);
+      margin: 0;
+      color: rgb(227,26,26);
+      font-size: clamp(22px, 2.4vw, 34px); /* 原: 28px,3.2vw,42px */
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    #tool-buttons {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: clamp(20px, 8vh, 120px);
+      display: flex;
+      gap: clamp(12px, 1.6vw, 24px); /* 原: 16px,2vw,32px */
+      z-index: 3;
+    }
+
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+
+    /* ↓ 按钮字体 & 内边距缩小 */
+    button {
+      font-size: clamp(24px, 2.8vw, 36px);   /* 原: 32px,3.6vw,48px */
+      border: 4px solid #e00d0d;
+      border-radius: 16px;
+      background: #fff3d1;
+      cursor: pointer;
+      padding: clamp(8px, 0.9vw, 12px) clamp(14px, 1.4vw, 22px); /* 原更大 */
+      transition: 0.2s;
+      box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
+    }
+
+    button:hover { background: #ffeaa7; transform: scale(1.05); }
+    button.active {
+      background: #ff4747; color: white; border-color: #b40000;
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
+    }
+
+    /* ↓ tooltip 字体也略小一点 */
+    .tooltip .tooltip-text {
+      visibility: hidden;
+      width: max-content;
+      background-color: #ffeaa7;
+      color: #F44336;
+      text-align: center;
+      border-radius: 6px;
+      padding: clamp(6px, 0.8vw, 10px) clamp(8px, 1vw, 14px);
+      position: absolute;
+      z-index: 5;
+      bottom: 140%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: clamp(14px, 1.8vw, 18px); /* 原: 16px,2vw,22px */
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      font-family: 'Bungee', cursive;
+      white-space: nowrap;
+    }
+    .tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+    canvas {
+      display: block;
+      margin: 0 auto;
+      margin-top: clamp(320px, 36vh, 520px);
+      width: clamp(1400px, 96vmin, 1800px);
+      height: auto;
+      max-width: 98vw;
+      border-radius: 16px;
+      position: relative;
+      z-index: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🩸 Pop Your Pimples 🩸</h1>
+  <h2>Choose Your Tool!</h2>
+
+  <div id="tool-buttons">
+    <div class="tooltip">
+      <button id="needle-btn" class="active">🪡</button>
+      <span class="tooltip-text">Pops instantly!</span>
+    </div>
+
+    <div class="tooltip">
+      <button id="finger-btn">👆</button>
+      <span class="tooltip-text">Hold to pop!</span>
+    </div>
+  </div>
+
+  <script src="sketch.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,16 @@
+html, body {
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* 画布：居中 + 往下挪一点（这里是 80px，自行改大小）*/
+canvas {
+  display: block;
+  margin: 200px auto 0;  /* 上 80px | 左右 auto | 下 0 */
+}
+
+video {
+  display: block;
+  margin: 0 auto;
+}
