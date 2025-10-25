@@ -48,6 +48,7 @@ a.btn:hover{ transform: translateY(-1px); }
 a.btn:active{ transform: translateY(0); }
 
 a.btn.a{ top: 380px; }
-a.btn.b{ top: 430px; background:#963f78c5; color:#fff; }
+a.btn.b{ top: 430px; }
 a.btn.c{ top: 480px; }
 a.btn.d{ top: 530px; }
+a.btn.e{ top:590px; }
