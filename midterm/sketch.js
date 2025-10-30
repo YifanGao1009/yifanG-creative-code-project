@@ -4,6 +4,14 @@ let facemeshModel;
 let lastPts = null;
 let currentTool = "🪡";
 
+
+let handpose;
+let hands = [];
+let pinchClosed = false;
+let prevPinchClosed = false;
+const PINCH_CLOSE = 60;
+const PINCH_OPEN  = 70;
+
 // Part 2 — Pimples
 const EYE_BLOCK_SCALE = 0.9;
 const EYE_EXTRA_PROTECT_PADDING = 8;
@@ -23,24 +31,26 @@ const smallDropSpeed  = 1.6;
 const bigDropSpeed    = 3.0;
 const gravity         = 0.09;
 
-// Perlin
+// Perlin / blush
 let blushSpots = [];
 const BLUSH_BASE_RADIUS  = 70;
 const BLUSH_LIFE         = 50;
 const BLUSH_MAX_ALPHA    = 200;
 const BLUSH_NOISE_SCALE  = 0.030;
-// color
+
 const pimpleColors = [
   { outer:[255, 211, 208], inner:[240, 0, 12],  highlight:[255, 243, 243] },
   { outer:[255, 180, 190], inner:[210, 70, 90], highlight:[255, 243, 243] },
   { outer:[255, 200, 205], inner:[255,108,100], highlight:[255, 243, 243] }
 ];
-const FINGER_HOLD_FRAMES = 24; // 手指按住多少帧后强制爆
-let pimple = [];            // 全部痘痘
-let Drop   = [];            // 飞溅滴
-let pimpleCounter = 1;      // 自增 id
-let pimpleCreated = false;  // 是否已经根据人脸生成过痘痘
-let anchorById = {};        // 痘痘锚定到的 mesh 索引
+
+const FINGER_HOLD_FRAMES = 24;
+let pimple = [];
+let Drop   = [];
+let pimpleCounter = 1;
+let pimpleCreated = false;
+let anchorById = {};
+
 function mid2(ax, ay, bx, by) {
   return { x:(ax+bx)/2, y:(ay+by)/2 };
 }
@@ -63,21 +73,26 @@ function getEyeZones(pts) {
 
 function setup() {
   const c = createCanvas(640, 480);
-c.style("display", "block");
-c.style("margin", "0 auto");
-c.style("margin-top", "20px"); 
+  c.parent(document.body);
+  c.style("display", "block");
+  c.style("margin", "0 auto");
 
   c.mouseOver(() => noCursor());
   c.mouseOut(() => cursor());
+
   camera = createCapture(VIDEO);
   camera.size(640, 480);
   camera.hide();
 
-
+  // Face (facemesh)
   facemeshModel = ml5.facemesh(camera, () => console.log("facemesh ready"));
   facemeshModel.on("predict", gotFaces);
 
 
+  handpose = ml5.handpose(camera, () => console.log("handpose ready"));
+  handpose.on('predict', gotHands);
+
+  // 可选 UI
   const needleBtn = document.getElementById("needle-btn");
   const fingerBtn = document.getElementById("finger-btn");
   if (needleBtn && fingerBtn) {
@@ -97,7 +112,6 @@ c.style("margin-top", "20px");
 function gotFaces(results) {
   if (results.length > 0) {
     lastPts = results[0].scaledMesh;
-
     if (!pimpleCreated) {
       spawnPimplesFromMesh(lastPts);
       pimpleCreated = true;
@@ -115,12 +129,67 @@ function draw() {
   image(camera, 0, 0, width, height);
   runPimplesSystem();
   pop();
+
   drawBlushLayer();
-  
+
+  // 工具光标
   if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
     textSize(36);
     textAlign(CENTER, CENTER);
     text(currentTool, mouseX, mouseY);
+  }
+
+  // —— 手势检测（稳定版 handpose 的数据结构）——
+  prevPinchClosed = pinchClosed;
+
+  if (hands.length > 0) {
+    // 稳定版：hands[0].annotations 里分组好的关键点
+    const ann = hands[0].annotations;
+    if (ann && ann.thumb && ann.indexFinger) {
+      // 指尖在每个分组数组的第 4 个（索引 3）
+      const thumbTip = createVector(ann.thumb[3][0],       ann.thumb[3][1]);
+      const indexTip = createVector(ann.indexFinger[3][0],  ann.indexFinger[3][1]);
+
+      const d = dist(thumbTip.x, thumbTip.y, indexTip.x, indexTip.y);
+
+      // 迟滞逻辑
+      if (d < PINCH_CLOSE)       pinchClosed = true;
+      else if (d > PINCH_OPEN)   pinchClosed = false;
+
+      // 刚刚夹住 → 在两指中点附近“爆”最近 growing 痘痘（注意：这里用相机坐标系）
+      if (pinchClosed && !prevPinchClosed) {
+        const mx = (thumbTip.x + indexTip.x) * 0.5;
+        const my = (thumbTip.y + indexTip.y) * 0.5;
+        popNearestPimpleAt(mx, my);
+      }
+
+      // （可选）调试可视化
+      // push();
+      // noFill(); stroke(255,255,0); strokeWeight(2);
+      // line(thumbTip.x, thumbTip.y, indexTip.x, indexTip.y);
+      // pop();
+    }
+  }
+}
+
+// 在相机坐标系寻找最近的 growing 痘痘并击破
+function popNearestPimpleAt(x, y) {
+  let target = null;
+  let bestD = Infinity;
+  const RANGE = 60; // 手势作用半径
+
+  for (const p of pimple) {
+    if (p.state !== 'growing') continue;
+    const d = dist(x, y, p.pos.x, p.pos.y);
+    if (d < bestD && d <= RANGE) {
+      bestD = d;
+      target = p;
+    }
+  }
+  if (target) {
+    popOne(target);
+    target.state = 'popped';
+    target.holdTime = 0;
   }
 }
 
@@ -141,7 +210,6 @@ function spawnPimplesFromMesh(pts) {
     const x = pts[meshIdx][0];
     const y = pts[meshIdx][1];
 
-
     if (eyes) {
       const inLeft  = dist(x, y, eyes.L.x, eyes.L.y) < eyes.lRad;
       const inRight = dist(x, y, eyes.R.x, eyes.R.y) < eyes.rRad;
@@ -154,7 +222,6 @@ function spawnPimplesFromMesh(pts) {
     }
     if (!howfar) continue;
 
-    // 通过，生成
     const tone = random(pimpleColors);
     const obj = {
       pimpleId: pimpleCounter++,
@@ -172,15 +239,15 @@ function spawnPimplesFromMesh(pts) {
     anchorById[obj.pimpleId] = meshIdx;
   }
 }
-function runPimplesSystem() {
-  const mx = width - mouseX;
-  const my = mouseY;
 
+function runPimplesSystem() {
+  const mx = width - mouseX; // 鼠标在相机坐标系下的 X
+  const my = mouseY;
 
   for (let i = 0; i < pimple.length; i++) {
     const p = pimple[i];
 
-    // 痘痘位置跟随它绑定的关键点
+    // 位置跟随锚点
     if (lastPts && anchorById[p.pimpleId] !== undefined) {
       const idx = anchorById[p.pimpleId];
       if (lastPts[idx]) {
@@ -189,14 +256,12 @@ function runPimplesSystem() {
       }
     }
 
-    // 三种状态：growing-popped-scar
     if (p.state === 'growing') {
       p.pressure = constrain(p.pressure + p.growRate, 0, 1);
       if (mouseIsPressed) {
         const d = dist(mx, my, p.pos.x, p.pos.y);
         if (d < pressRadius) {
           const t = 1 - d / pressRadius;
-
           if (currentTool === "👆") {
             p.holdTime = (p.holdTime || 0) + 1;
             p.pressure = constrain(p.pressure + pressPower * (0.25 + t * 0.5), 0, 1);
@@ -226,10 +291,8 @@ function runPimplesSystem() {
       p.pressure = 0.10;
 
     } else if (p.state === 'scar') {
-
       p.cooldown--;
       if (p.cooldown <= 0) {
-
         if (lastPts) {
           let tries = 0;
           while (tries < 200) {
@@ -288,7 +351,6 @@ function runPimplesSystem() {
   }
 }
 
-// 绘制单个痘痘
 function drawPimple(p) {
   const r = p.baseSize * (0.6 + p.pressure * 1.4);
   const col = p.colorTone;
@@ -301,15 +363,12 @@ function drawPimple(p) {
     return;
   }
 
-  // 外圈
   fill(col.outer[0], col.outer[1], col.outer[2], 200);
   circle(p.pos.x, p.pos.y, r * 2);
 
-  // 内圈
   fill(col.inner[0], col.inner[1], col.inner[2]);
   circle(p.pos.x, p.pos.y, r * 1.2);
 
-  // 高光
   fill(col.highlight[0], col.highlight[1], col.highlight[2], 170);
   circle(p.pos.x - r * 0.25, p.pos.y - r * 0.25, r * 0.38);
 }
@@ -317,7 +376,6 @@ function drawPimple(p) {
 function popOne(p) {
   addBlushSpot(width - p.pos.x, p.pos.y, BLUSH_BASE_RADIUS);
 
-  // 小滴
   for (let i = 0; i < smalldropCount; i++) {
     const a = random(TWO_PI);
     const s = random(0.6, smallDropSpeed);
@@ -378,7 +436,6 @@ function addBlushSpot(x, y, rad = BLUSH_BASE_RADIUS) {
   blushSpots.push({ x, y, rad, life: BLUSH_LIFE, max: BLUSH_LIFE });
 }
 
-
 function drawBlushLayer() {
   if (blushSpots.length === 0) return;
 
@@ -395,7 +452,7 @@ function drawBlushLayer() {
     for (let yy = -b.rad; yy <= b.rad; yy += step) {
       for (let xx = -b.rad; xx <= b.rad; xx += step) {
         const rr2 = xx * xx + yy * yy;
-        if (rr2 > b.rad * b.rad) continue
+        if (rr2 > b.rad * b.rad) continue;
 
         const falloff = 1 - sqrt(rr2) / b.rad;
         const nn = noise(
@@ -414,6 +471,12 @@ function drawBlushLayer() {
   }
   pop();
 }
+
+
+function gotHands(results) {
+  hands = results;
+}
+
 
 
 

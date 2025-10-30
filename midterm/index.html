@@ -38,11 +38,24 @@
       pointer-events: none;
     }
 
+    h3 {
+      font-family: 'Bungee', cursive;
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: clamp(20px, 14vh, 120px);
+      margin: 0;
+      color: rgb(245, 87, 87);
+      font-size: clamp(8px, 1vw, 24px);
+      z-index: 3;
+      pointer-events: none;
+    }
+
     #tool-buttons {
       position: fixed;
       left: 50%;
       transform: translateX(-50%);
-      bottom: clamp(20px, 8vh, 120px);
+      bottom: clamp(6px, 2vh, 60px);
       display: flex;
       gap: clamp(12px, 1.6vw, 24px); /* 原: 16px,2vw,32px */
       z-index: 3;
@@ -71,7 +84,7 @@
       box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
     }
 
-    /* ↓ tooltip 字体也略小一点 */
+
     .tooltip .tooltip-text {
       visibility: hidden;
       width: max-content;
@@ -111,6 +124,8 @@
 <body>
   <h1>🩸 Pop Your Pimples 🩸</h1>
   <h2>Choose Your Tool!</h2>
+  <h3>Also, pinch with your thumb and index finger to pop.</h3>
+  
 
   <div id="tool-buttons">
     <div class="tooltip">
